@@ -1,0 +1,171 @@
+// Configuração: gera o código TypeScript e conecta no PostgreSQL
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- LISTAS FECHADAS DE VALORES ----------
+
+enum Role {
+  ADMIN     // configura tudo
+  GESTOR    // vê todas as conversas
+  VENDEDOR  // vê só as próprias conversas
+}
+
+enum StageKind {
+  OPEN  // venda em andamento
+  WON   // venda fechada
+  LOST  // venda perdida
+}
+
+enum MessageDirection {
+  INBOUND   // cliente -> empresa
+  OUTBOUND  // empresa -> cliente
+}
+
+enum MessageAuthor {
+  CONTACT  // o cliente
+  USER     // um vendedor
+  BOT      // resposta automática
+}
+
+// ---------- EMPRESA (cliente da Wiaflow) ----------
+// Quase toda tabela tem organizationId: cada empresa só vê os próprios dados.
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users         User[]
+  stages        Stage[]
+  contacts      Contact[]
+  conversations Conversation[]
+}
+
+// ---------- USUÁRIO (quem acessa o painel) ----------
+
+model User {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  email          String   @unique
+  passwordHash   String   // nunca a senha em si, só o "hash"
+  role           Role     @default(VENDEDOR)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization          Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedConversations Conversation[] @relation("AssignedTo")
+  sentMessages          Message[]
+  stageChanges          StageChange[]
+
+  @@index([organizationId])
+}
+
+// ---------- ESTÁGIO (coluna do kanban) ----------
+
+model Stage {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  color          String    @default("#5B636B")
+  position       Int       // ordem da coluna (0 = primeira)
+  kind           StageKind @default(OPEN)
+  createdAt      DateTime  @default(now())
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations Conversation[] @relation("CurrentStage")
+  suggestedFor  Conversation[] @relation("AiSuggestedStage")
+  changesFrom   StageChange[]  @relation("FromStage")
+  changesTo     StageChange[]  @relation("ToStage")
+
+  @@index([organizationId, position])
+}
+
+// ---------- CONTATO (cliente final, pelo número do WhatsApp) ----------
+
+model Contact {
+  id             String   @id @default(cuid())
+  organizationId String
+  phone          String   // só dígitos, ex.: 5511987654321
+  name           String?
+  createdAt      DateTime @default(now())
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@unique([organizationId, phone]) // mesmo número não repete na mesma empresa
+}
+
+// ---------- CONVERSA (um card do kanban) ----------
+
+model Conversation {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  contactId          String
+  stageId            String
+  assignedToId       String?   // vendedor responsável
+  estimatedValue     Decimal?  @db.Decimal(12, 2) // dinheiro: sempre Decimal
+  lastMessageAt      DateTime  @default(now())
+  lastInboundAt      DateTime? // última msg do cliente
+  lastOutboundAt     DateTime? // última msg da empresa
+  aiSuggestedStageId String?   // sugestão da IA (Etapa 5)
+  aiSuggestionReason String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact          Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  stage            Stage         @relation("CurrentStage", fields: [stageId], references: [id], onDelete: NoAction)
+  assignedTo       User?         @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  aiSuggestedStage Stage?        @relation("AiSuggestedStage", fields: [aiSuggestedStageId], references: [id], onDelete: SetNull)
+  messages         Message[]
+  stageChanges     StageChange[]
+
+  @@index([organizationId, stageId])
+  @@index([organizationId, assignedToId])
+}
+
+// ---------- MENSAGEM (cada balão da conversa) ----------
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String
+  direction      MessageDirection
+  author         MessageAuthor
+  body           String           @db.Text
+  waMessageId    String?          @unique // id do WhatsApp: evita salvar duplicado
+  sentById       String?
+  createdAt      DateTime         @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sentBy       User?        @relation(fields: [sentById], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+}
+
+// ---------- HISTÓRICO DE MUDANÇA DE ESTÁGIO ----------
+
+model StageChange {
+  id             String   @id @default(cuid())
+  conversationId String
+  fromStageId    String?
+  toStageId      String
+  changedById    String?
+  byAi           Boolean  @default(false) // veio de sugestão da IA?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  fromStage    Stage?       @relation("FromStage", fields: [fromStageId], references: [id], onDelete: SetNull)
+  toStage      Stage        @relation("ToStage", fields: [toStageId], references: [id], onDelete: NoAction)
+  changedBy    User?        @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+}
+
