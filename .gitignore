@@ -1,0 +1,5 @@
+node_modeules/
+dist/
+.env
+*.log
+coverage/
