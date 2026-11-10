@@ -1,5 +1,12 @@
-node_modeules/
-dist/
-.env
+# Dependências (baixadas pelo npm install, nunca vão para o Git)
+**/node_modules/
+
+# Arquivos gerados pela compilação
+**/dist/
+
+# Segredos e configurações locais
+**/.env
+
+# Logs e cobertura de testes
 *.log
 coverage/
