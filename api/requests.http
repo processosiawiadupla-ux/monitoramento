@@ -43,3 +43,67 @@ GET {{baseUrl}}/auth/me
 
 ### Página inicial agora exige login (sem token -> 401)
 GET {{baseUrl}}
+
+### ======== USUÁRIOS E ESTÁGIOS (como ADMIN) ========
+
+### Listar usuários (ADMIN -> 200)
+GET {{baseUrl}}/users
+Authorization: Bearer {{token}}
+
+### Criar vendedora Carla (ADMIN -> 201)
+POST {{baseUrl}}/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Carla",
+  "email": "carla@wiaflow.local",
+  "password": "senhaforte123",
+  "role": "VENDEDOR"
+}
+
+### Listar estágios (-> 200)
+GET {{baseUrl}}/stages
+Authorization: Bearer {{token}}
+
+### Criar estágio (ADMIN -> 201)
+POST {{baseUrl}}/stages
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Pós-venda",
+  "color": "#0E7490"
+}
+
+### ======== TESTE DE PERMISSÃO (como VENDEDORA) ========
+
+### Login da Ana
+# @name loginAna
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ana@wiaflow.local",
+  "password": "admin12345"
+}
+
+###
+@tokenAna = {{loginAna.response.body.accessToken}}
+
+### Ana lista estágios (VENDEDOR pode -> 200)
+GET {{baseUrl}}/stages
+Authorization: Bearer {{tokenAna}}
+
+### Ana tenta listar usuários (VENDEDOR não pode -> 403)
+GET {{baseUrl}}/users
+Authorization: Bearer {{tokenAna}}
+
+### Ana tenta criar estágio (só ADMIN -> 403)
+POST {{baseUrl}}/stages
+Authorization: Bearer {{tokenAna}}
+Content-Type: application/json
+
+{
+  "name": "Estágio da Ana"
+}

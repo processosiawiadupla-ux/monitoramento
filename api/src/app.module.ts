@@ -1,3 +1,6 @@
+import { UsersModule } from './users/users.module';
+import { StagesModule } from './stages/stages.module';
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -15,6 +18,8 @@ import { RolesGuard } from './auth/roles.guard';
     PrismaModule,
     HealthModule,
     AuthModule,
+    UsersModule,
+    StagesModule,
   ],
   controllers: [AppController],
   providers: [
