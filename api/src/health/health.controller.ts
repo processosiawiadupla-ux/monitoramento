@@ -1,4 +1,5 @@
 // GET /api/health -> confere se a API e o banco estão funcionando
+import { Public } from '../auth/decorators';
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -6,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
+  @Public()
   @Get()
   async check() {
     try {

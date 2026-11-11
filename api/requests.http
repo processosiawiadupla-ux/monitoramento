@@ -4,6 +4,7 @@
 GET {{baseUrl}}/health
 
 ### Login certo (deve devolver o accessToken)
+# @name login
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -29,3 +30,16 @@ Content-Type: application/json
   "email": "isso-nao-e-email",
   "password": "admin12345"
 }
+
+### ---- Token pego automaticamente do "Login certo" ----
+@token = {{login.response.body.accessToken}}
+
+### Quem sou eu? (com token -> 200)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### Quem sou eu? (sem token -> 401)
+GET {{baseUrl}}/auth/me
+
+### Página inicial agora exige login (sem token -> 401)
+GET {{baseUrl}}

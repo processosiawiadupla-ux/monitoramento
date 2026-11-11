@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,20 +12,15 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    // 1) Procura o usuário pelo e-mail
     const user = await this.prisma.user.findUnique({
       where: { email: email.trim().toLowerCase() },
     });
 
-    // 2) Compara a senha digitada com o hash salvo no banco
     const senhaOk = user ? await bcrypt.compare(password, user.passwordHash) : false;
-
-    // Mesma mensagem para "e-mail não existe" e "senha errada" (segurança)
     if (!user || !user.active || !senhaOk) {
       throw new UnauthorizedException('E-mail ou senha incorretos.');
     }
 
-    // 3) Monta o conteúdo do token e assina
     const payload: JwtPayload = {
       sub: user.id,
       orgId: user.organizationId,
@@ -37,5 +32,21 @@ export class AuthService {
       accessToken: await this.jwt.signAsync(payload),
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     };
+  }
+
+  // Dados do usuário logado. "select" escolhe as colunas: NUNCA devolva o passwordHash!
+  async me(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        organization: { select: { id: true, name: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('Usuário não encontrado.');
+    return user;
   }
 }
