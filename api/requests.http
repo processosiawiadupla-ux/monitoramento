@@ -1,0 +1,31 @@
+@baseUrl = http://localhost:3333/api
+
+### A API está viva?
+GET {{baseUrl}}/health
+
+### Login certo (deve devolver o accessToken)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@wiaflow.local",
+  "password": "admin12345"
+}
+
+### Senha errada (deve dar 401)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@wiaflow.local",
+  "password": "senhaerrada"
+}
+
+### E-mail inválido (deve dar 400)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "isso-nao-e-email",
+  "password": "admin12345"
+}

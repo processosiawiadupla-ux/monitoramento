@@ -1,0 +1,11 @@
+// DTO = formato dos dados que chegam na rota, com regras de validação.
+import { IsEmail, IsString, MinLength } from 'class-validator';
+
+export class LoginDto {
+  @IsEmail({}, { message: 'Informe um e-mail válido.' })
+  email!: string;
+
+  @IsString()
+  @MinLength(6, { message: 'A senha precisa ter pelo menos 6 caracteres.' })
+  password!: string;
+}
