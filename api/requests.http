@@ -4,7 +4,6 @@
 GET {{baseUrl}}/health
 
 ### ======== LOGINS ========
-
 ### Login do admin
 # @name login
 POST {{baseUrl}}/auth/login
@@ -117,3 +116,71 @@ Content-Type: application/json
   "stageId": "estagio-que-nao-existe"
 }
 
+### ======== ESTÁGIOS: EDITAR, REORDENAR, ARQUIVAR (Passo 18) ========
+
+### Estágios vistos pelo admin (-> 200 com 6)
+# @name stagesAdmin
+GET {{baseUrl}}/stages
+Authorization: Bearer {{token}}
+
+### Renomear "Qualificação" (-> 200)
+PATCH {{baseUrl}}/stages/{{stagesAdmin.response.body.$[1].id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Qualificação do lead",
+  "color": "#6D28D9"
+}
+
+### Trocar a ordem das duas primeiras colunas (-> 200, lista na nova ordem)
+PATCH {{baseUrl}}/stages/reorder
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ids": [
+    "{{stagesAdmin.response.body.$[1].id}}",
+    "{{stagesAdmin.response.body.$[0].id}}",
+    "{{stagesAdmin.response.body.$[2].id}}",
+    "{{stagesAdmin.response.body.$[3].id}}",
+    "{{stagesAdmin.response.body.$[4].id}}",
+    "{{stagesAdmin.response.body.$[5].id}}"
+  ]
+}
+
+### Reordenar faltando estágio (-> 400)
+PATCH {{baseUrl}}/stages/reorder
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ids": ["{{stagesAdmin.response.body.$[0].id}}"]
+}
+
+### Criar estágio temporário (-> 201)
+# @name novoEstagio
+POST {{baseUrl}}/stages
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Estágio de teste"
+}
+
+### Arquivar o estágio temporário (sem conversas -> 200)
+DELETE {{baseUrl}}/stages/{{novoEstagio.response.body.id}}
+Authorization: Bearer {{token}}
+
+### Arquivar "Perdido" sem dizer para onde mover (tem conversa -> 409)
+DELETE {{baseUrl}}/stages/{{stagesAdmin.response.body.$[5].id}}
+Authorization: Bearer {{token}}
+
+### Ana tenta renomear estágio (VENDEDOR não pode -> 403)
+PATCH {{baseUrl}}/stages/{{stagesAdmin.response.body.$[1].id}}
+Authorization: Bearer {{tokenAna}}
+Content-Type: application/json
+
+{
+  "name": "Nome da Ana"
+}

@@ -108,7 +108,7 @@ export class ConversationsService {
 
     // O estágio de destino precisa ser da MESMA empresa
     const destino = await this.prisma.stage.findFirst({
-      where: { id: stageId, organizationId: user.orgId },
+            where: { id: stageId, organizationId: user.orgId, archived: false },
     });
     if (!destino) throw new BadRequestException('Estágio de destino inválido.');
 

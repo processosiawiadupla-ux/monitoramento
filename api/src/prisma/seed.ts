@@ -1,3 +1,5 @@
+// Cria os dados iniciais para desenvolvimento.
+// Rode com: npx prisma db seed   (pode rodar várias vezes: apaga e recria)
 import { MessageAuthor, MessageDirection, PrismaClient, Role, StageKind } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -5,6 +7,7 @@ const prisma = new PrismaClient();
 
 const STAGES = [
   { name: 'Novo lead', color: '#2F6FDB', kind: StageKind.OPEN },
+  { name: 'Qualificação', color: '#7A4FD6', kind: StageKind.OPEN },
   { name: 'Proposta enviada', color: '#C27A00', kind: StageKind.OPEN },
   { name: 'Negociação', color: '#D2560F', kind: StageKind.OPEN },
   { name: 'Venda fechada', color: '#0B6E4F', kind: StageKind.WON },
@@ -18,7 +21,15 @@ async function main() {
   const DEMO = 'Wiaflow Demo';
   const senha = 'admin12345';
 
-  await prisma.organization.deleteMany({ where: { name: DEMO } });
+  // ---------- Apaga a empresa demo anterior ----------
+  // A ordem importa: primeiro o que APONTA para os estágios (histórico e conversas),
+  // depois a empresa (que apaga o resto junto: usuários, estágios, contatos).
+  const antigas = await prisma.organization.findMany({ where: { name: DEMO }, select: { id: true } });
+  const idsAntigas = antigas.map((o) => o.id);
+  await prisma.stageChange.deleteMany({ where: { conversation: { organizationId: { in: idsAntigas } } } });
+  await prisma.conversation.deleteMany({ where: { organizationId: { in: idsAntigas } } });
+  await prisma.organization.deleteMany({ where: { id: { in: idsAntigas } } });
+
   const org = await prisma.organization.create({ data: { name: DEMO } });
 
   // ---------- Usuários ----------
@@ -118,5 +129,3 @@ main()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
-
-  
