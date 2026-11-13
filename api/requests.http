@@ -3,7 +3,9 @@
 ### A API está viva?
 GET {{baseUrl}}/health
 
-### Login certo (deve devolver o accessToken)
+### ======== LOGINS ========
+
+### Login do admin
 # @name login
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
@@ -13,72 +15,7 @@ Content-Type: application/json
   "password": "admin12345"
 }
 
-### Senha errada (deve dar 401)
-POST {{baseUrl}}/auth/login
-Content-Type: application/json
-
-{
-  "email": "admin@wiaflow.local",
-  "password": "senhaerrada"
-}
-
-### E-mail inválido (deve dar 400)
-POST {{baseUrl}}/auth/login
-Content-Type: application/json
-
-{
-  "email": "isso-nao-e-email",
-  "password": "admin12345"
-}
-
-### ---- Token pego automaticamente do "Login certo" ----
-@token = {{login.response.body.accessToken}}
-
-### Quem sou eu? (com token -> 200)
-GET {{baseUrl}}/auth/me
-Authorization: Bearer {{token}}
-
-### Quem sou eu? (sem token -> 401)
-GET {{baseUrl}}/auth/me
-
-### Página inicial agora exige login (sem token -> 401)
-GET {{baseUrl}}
-
-### ======== USUÁRIOS E ESTÁGIOS (como ADMIN) ========
-
-### Listar usuários (ADMIN -> 200)
-GET {{baseUrl}}/users
-Authorization: Bearer {{token}}
-
-### Criar vendedora Carla (ADMIN -> 201)
-POST {{baseUrl}}/users
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "name": "Carla",
-  "email": "carla@wiaflow.local",
-  "password": "senhaforte123",
-  "role": "VENDEDOR"
-}
-
-### Listar estágios (-> 200)
-GET {{baseUrl}}/stages
-Authorization: Bearer {{token}}
-
-### Criar estágio (ADMIN -> 201)
-POST {{baseUrl}}/stages
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "name": "Pós-venda",
-  "color": "#0E7490"
-}
-
-### ======== TESTE DE PERMISSÃO (como VENDEDORA) ========
-
-### Login da Ana
+### Login da Ana (vendedora)
 # @name loginAna
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
@@ -89,21 +26,94 @@ Content-Type: application/json
 }
 
 ###
+@token = {{login.response.body.accessToken}}
 @tokenAna = {{loginAna.response.body.accessToken}}
 
-### Ana lista estágios (VENDEDOR pode -> 200)
-GET {{baseUrl}}/stages
-Authorization: Bearer {{tokenAna}}
+### Quem sou eu? (-> 200)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
 
-### Ana tenta listar usuários (VENDEDOR não pode -> 403)
+### ======== USUÁRIOS E ESTÁGIOS ========
+
+### Listar usuários (ADMIN -> 200)
+GET {{baseUrl}}/users
+Authorization: Bearer {{token}}
+
+### Ana tenta listar usuários (-> 403)
 GET {{baseUrl}}/users
 Authorization: Bearer {{tokenAna}}
 
-### Ana tenta criar estágio (só ADMIN -> 403)
-POST {{baseUrl}}/stages
+### Estágios (-> 200; usado nos testes de mover)
+# @name stages
+GET {{baseUrl}}/stages
+Authorization: Bearer {{tokenAna}}
+
+### ======== CONVERSAS (Passo 16) ========
+
+### ADMIN lista todas (-> 8)
+GET {{baseUrl}}/conversations
+Authorization: Bearer {{token}}
+
+### Busca por nome (-> só Mariana)
+GET {{baseUrl}}/conversations?search=mari
+Authorization: Bearer {{token}}
+
+### Busca por telefone (-> só Felipe)
+GET {{baseUrl}}/conversations?search=1991207788
+Authorization: Bearer {{token}}
+
+### Ana lista as dela (-> 4)
+# @name convAna
+GET {{baseUrl}}/conversations
+Authorization: Bearer {{tokenAna}}
+
+### Ana abre uma conversa dela (-> 200 com mensagens)
+GET {{baseUrl}}/conversations/{{convAna.response.body.$[0].id}}
+Authorization: Bearer {{tokenAna}}
+
+### Conversa que não existe (-> 404)
+GET {{baseUrl}}/conversations/id-que-nao-existe
+Authorization: Bearer {{token}}
+
+### ======== MOVER, ATRIBUIR, EDITAR (Passo 17) ========
+
+### Ana move a 1ª conversa dela para "Proposta enviada" (-> 200)
+PATCH {{baseUrl}}/conversations/{{convAna.response.body.$[0].id}}/stage
 Authorization: Bearer {{tokenAna}}
 Content-Type: application/json
 
 {
-  "name": "Estágio da Ana"
+  "stageId": "{{stages.response.body.$[2].id}}"
 }
+
+### Histórico da conversa (-> a mudança aparece no topo, com o nome da Ana)
+GET {{baseUrl}}/conversations/{{convAna.response.body.$[0].id}}/history
+Authorization: Bearer {{tokenAna}}
+
+### Ana edita o valor estimado (-> 200)
+PATCH {{baseUrl}}/conversations/{{convAna.response.body.$[0].id}}
+Authorization: Bearer {{tokenAna}}
+Content-Type: application/json
+
+{
+  "estimatedValue": 3500.50
+}
+
+### Ana tenta atribuir (VENDEDOR não pode -> 403)
+PATCH {{baseUrl}}/conversations/{{convAna.response.body.$[0].id}}/assign
+Authorization: Bearer {{tokenAna}}
+Content-Type: application/json
+
+{
+  "assignedToId": null
+}
+
+### Estágio inválido (-> 400)
+PATCH {{baseUrl}}/conversations/{{convAna.response.body.$[0].id}}/stage
+Authorization: Bearer {{tokenAna}}
+Content-Type: application/json
+
+{
+  "stageId": "estagio-que-nao-existe"
+}
+

@@ -1,3 +1,5 @@
+import { ConversationsModule } from './conversations/conversations.module';
+
 import { UsersModule } from './users/users.module';
 import { StagesModule } from './stages/stages.module';
 
@@ -20,6 +22,7 @@ import { RolesGuard } from './auth/roles.guard';
     AuthModule,
     UsersModule,
     StagesModule,
+    ConversationsModule,
   ],
   controllers: [AppController],
   providers: [
