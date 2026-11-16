@@ -7,7 +7,6 @@ export type Me = {
   role: Role;
   organization: { id: string; name: string };
 };
-
 export type Stage = {
   id: string;
   name: string;
@@ -25,3 +24,11 @@ export type ConversationSummary = {
   assignedTo: { id: string; name: string } | null;
   messages: { body: string; author: 'CONTACT' | 'USER' | 'BOT'; createdAt: string }[];
 };
+export type UserSummary = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  active: boolean;
+};
+
