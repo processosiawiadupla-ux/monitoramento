@@ -41,10 +41,11 @@ model Organization {
   name      String
   createdAt DateTime @default(now())
 
-  users         User[]
-  stages        Stage[]
-  contacts      Contact[]
-  conversations Conversation[]
+  users           User[]
+  stages          Stage[]
+  contacts        Contact[]
+  conversations   Conversation[]
+  whatsappNumbers WhatsAppNumber[]
 }
 
 // ---------- USUÁRIO (quem acessa o painel) ----------
@@ -60,12 +61,34 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization          Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assignedConversations Conversation[] @relation("AssignedTo")
+  organization          Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedConversations Conversation[]   @relation("AssignedTo")
   sentMessages          Message[]
   stageChanges          StageChange[]
+  ownedNumbers          WhatsAppNumber[] @relation("NumberOwner")
 
   @@index([organizationId])
+}
+
+// ---------- NÚMERO DE WHATSAPP (um chip da empresa) ----------
+// Cada número pertence a uma empresa e, normalmente, a uma vendedora.
+// Mensagem chegou no número da Ana -> a conversa é da Ana, automaticamente.
+
+model WhatsAppNumber {
+  id              String   @id @default(cuid())
+  organizationId  String
+  phone           String   // só dígitos, ex.: 5511900000001
+  label           String   // nome para mostrar, ex.: "Comercial · Ana"
+  ownerId         String?  // vendedora dona do número
+  waPhoneNumberId String?  @unique // id que a Meta dá ao número (preenchido ao conectar)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner         User?          @relation("NumberOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  conversations Conversation[]
+
+  @@unique([organizationId, phone]) // o mesmo número não repete na mesma empresa
 }
 
 // ---------- ESTÁGIO (coluna do kanban) ----------
@@ -77,7 +100,7 @@ model Stage {
   color          String    @default("#5B636B")
   position       Int       // ordem da coluna (0 = primeira)
   kind           StageKind @default(OPEN)
-  archived       Boolean   @default(false)
+  archived       Boolean   @default(false) // arquivado = some do kanban, mas fica no histórico
   createdAt      DateTime  @default(now())
 
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -111,26 +134,29 @@ model Conversation {
   organizationId     String
   contactId          String
   stageId            String
+  whatsappNumberId   String?   // por qual número da empresa a conversa chegou
   assignedToId       String?   // vendedor responsável
   estimatedValue     Decimal?  @db.Decimal(12, 2) // dinheiro: sempre Decimal
   lastMessageAt      DateTime  @default(now())
   lastInboundAt      DateTime? // última msg do cliente
   lastOutboundAt     DateTime? // última msg da empresa
-  aiSuggestedStageId String?   // sugestão da IA (Etapa 5)
+  aiSuggestedStageId String?   // sugestão da IA
   aiSuggestionReason String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  contact          Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  stage            Stage         @relation("CurrentStage", fields: [stageId], references: [id], onDelete: NoAction)
-  assignedTo       User?         @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
-  aiSuggestedStage Stage?        @relation("AiSuggestedStage", fields: [aiSuggestedStageId], references: [id], onDelete: SetNull)
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact          Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  stage            Stage           @relation("CurrentStage", fields: [stageId], references: [id], onDelete: NoAction)
+  whatsappNumber   WhatsAppNumber? @relation(fields: [whatsappNumberId], references: [id], onDelete: SetNull)
+  assignedTo       User?           @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  aiSuggestedStage Stage?          @relation("AiSuggestedStage", fields: [aiSuggestedStageId], references: [id], onDelete: SetNull)
   messages         Message[]
   stageChanges     StageChange[]
 
   @@index([organizationId, stageId])
   @@index([organizationId, assignedToId])
+  @@index([whatsappNumberId])
 }
 
 // ---------- MENSAGEM (cada balão da conversa) ----------
@@ -159,7 +185,7 @@ model StageChange {
   fromStageId    String?
   toStageId      String
   changedById    String?
-  byAi           Boolean  @default(false) // veio de sugestão da IA?
+  byAi           Boolean  @default(false) // veio da IA ou de uma regra automática?
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -169,4 +195,3 @@ model StageChange {
 
   @@index([conversationId, createdAt])
 }
-

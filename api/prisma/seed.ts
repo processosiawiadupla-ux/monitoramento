@@ -2,9 +2,9 @@
 // Rode com: npx prisma db seed   (pode rodar várias vezes: apaga e recria)
 import { MessageAuthor, MessageDirection, PrismaClient, Role, StageKind } from '@prisma/client';
 import bcrypt from 'bcryptjs';
- 
+
 const prisma = new PrismaClient();
- 
+
 const STAGES = [
   { name: 'Novo lead', color: '#2F6FDB', kind: StageKind.OPEN },
   { name: 'Qualificação', color: '#7A4FD6', kind: StageKind.OPEN },
@@ -13,14 +13,14 @@ const STAGES = [
   { name: 'Venda fechada', color: '#0B6E4F', kind: StageKind.WON },
   { name: 'Perdido', color: '#8A9097', kind: StageKind.LOST },
 ];
- 
+
 // minutosAtras(30) = data/hora de 30 minutos atrás
 const minutosAtras = (min: number) => new Date(Date.now() - min * 60_000);
- 
+
 async function main() {
   const DEMO = 'Wiaflow Demo';
   const senha = 'admin12345';
- 
+
   // ---------- Apaga a empresa demo anterior ----------
   // A ordem importa: primeiro o que APONTA para os estágios (histórico e conversas),
   // depois a empresa (que apaga o resto junto: usuários, estágios, contatos).
@@ -29,26 +29,36 @@ async function main() {
   await prisma.stageChange.deleteMany({ where: { conversation: { organizationId: { in: idsAntigas } } } });
   await prisma.conversation.deleteMany({ where: { organizationId: { in: idsAntigas } } });
   await prisma.organization.deleteMany({ where: { id: { in: idsAntigas } } });
- 
+
   const org = await prisma.organization.create({ data: { name: DEMO } });
- 
+
   // ---------- Usuários ----------
   const passwordHash = await bcrypt.hash(senha, 10);
   const criarUsuario = (name: string, email: string, role: Role) =>
     prisma.user.create({ data: { name, email, role, passwordHash, organizationId: org.id } });
- 
+
   const admin = await criarUsuario('Administrador', 'admin@wiaflow.local', Role.ADMIN);
   await criarUsuario('Gestora Paula', 'gestor@wiaflow.local', Role.GESTOR);
   const ana = await criarUsuario('Ana', 'ana@wiaflow.local', Role.VENDEDOR);
   const bruno = await criarUsuario('Bruno', 'bruno@wiaflow.local', Role.VENDEDOR);
- 
+
+  // ---------- Números de WhatsApp (um chip da empresa para cada vendedora) ----------
+  const numeroAna = await prisma.whatsAppNumber.create({
+    data: { organizationId: org.id, phone: '5511900000001', label: 'Comercial · Ana', ownerId: ana.id },
+  });
+  const numeroBruno = await prisma.whatsAppNumber.create({
+    data: { organizationId: org.id, phone: '5511900000002', label: 'Comercial · Bruno', ownerId: bruno.id },
+  });
+  // Para achar o número de cada vendedor na hora de criar as conversas
+  const numeroDo = (vendedorId: string) => (vendedorId === ana.id ? numeroAna : numeroBruno);
+
   // ---------- Estágios ----------
   const stages = [];
   for (const [position, s] of STAGES.entries()) {
     stages.push(await prisma.stage.create({ data: { ...s, position, organizationId: org.id } }));
   }
   const [novo, qualificacao, proposta, negociacao, ganho, perdido] = stages;
- 
+
   // ---------- Conversas de exemplo ----------
   // from: 'c' = cliente, 'v' = vendedor   |   ago = minutos atrás
   const exemplos = [
@@ -88,17 +98,18 @@ async function main() {
         { from: 'v', text: 'Entendo, Larissa. Fico à disposição!', ago: 895 },
       ] },
   ];
- 
+
   for (const ex of exemplos) {
     const doCliente = ex.msgs.filter((m) => m.from === 'c');
     const daEmpresa = ex.msgs.filter((m) => m.from !== 'c');
     const ultima = ex.msgs[ex.msgs.length - 1];
- 
+
     await prisma.conversation.create({
       data: {
         organization: { connect: { id: org.id } },
         contact: { create: { name: ex.nome, phone: ex.fone, organizationId: org.id } },
         stage: { connect: { id: ex.stage.id } },
+        whatsappNumber: { connect: { id: numeroDo(ex.vendedor.id).id } }, // chegou pelo número da vendedora
         assignedTo: { connect: { id: ex.vendedor.id } },
         estimatedValue: ex.valor,
         lastMessageAt: minutosAtras(ultima.ago),
@@ -117,12 +128,13 @@ async function main() {
       },
     });
   }
- 
+
   console.log('✔ Seed concluído!');
+  console.log('  2 números de WhatsApp criados (Ana e Bruno)');
   console.log(`  ${exemplos.length} conversas criadas`);
   console.log(`  Logins (senha: ${senha}): admin@, gestor@, ana@, bruno@ wiaflow.local`);
 }
- 
+
 main()
   .catch((err) => {
     console.error('✖ Erro no seed:', err);
