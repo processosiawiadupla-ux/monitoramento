@@ -1,17 +1,28 @@
+import { useDroppable } from '@dnd-kit/core';
 import type { ConversationSummary, Stage } from '@/types';
 import { formatBRL } from '@/lib/format';
 import { ConversationCard } from './ConversationCard';
+
 type Props = {
   stage: Stage;
-  conversas: ConversationSummary[]; // só as conversas DESTA coluna
+  conversas: ConversationSummary[];
 };
 
 export function StageColumn({ stage, conversas }: Props) {
-  // Soma o valor estimado de todas as conversas da coluna
+  // Torna a coluna um "lugar para soltar". O id é o do estágio: é assim que,
+  // ao soltar, sabemos PARA ONDE a conversa foi.
+  const { setNodeRef, isOver } = useDroppable({ id: stage.id });
+
   const total = conversas.reduce((soma, c) => soma + Number(c.estimatedValue ?? 0), 0);
 
   return (
-    <section aria-label={stage.name} className="flex w-72 shrink-0 flex-col gap-3 rounded-xl bg-slate-100 p-3">
+    <section
+      ref={setNodeRef}
+      aria-label={stage.name}
+      className={`flex w-72 shrink-0 flex-col gap-3 rounded-xl p-3 transition-colors ${
+        isOver ? 'bg-green-100 ring-2 ring-green-600' : 'bg-slate-100'
+      }`}
+    >
       <header>
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">

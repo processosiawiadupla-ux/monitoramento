@@ -2,16 +2,30 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
 import { api, clearToken } from '@/lib/api';
 import type { ConversationSummary, Me, Stage } from '@/types';
 import { StageColumn } from '@/components/StageColumn';
+
 export default function PipelinePage() {
   const router = useRouter();
   const [eu, setEu] = useState<Me | null>(null);
   const [stages, setStages] = useState<Stage[]>([]);
   const [conversas, setConversas] = useState<ConversationSummary[]>([]);
+  const [erro, setErro] = useState('');
 
-  // Quando a tela aparece: busca os 3 dados AO MESMO TEMPO
+  const sensores = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
+
   useEffect(() => {
     Promise.all([
       api<Me>('/auth/me'),
@@ -28,6 +42,40 @@ export default function PipelinePage() {
         router.replace('/login');
       });
   }, [router]);
+
+
+  async function aoSoltar(evento: DragEndEvent) {
+    const { active, over } = evento;
+    if (!over) return; 
+
+    const conversaId = String(active.id); 
+    const destinoId = String(over.id);    
+
+    const conversa = conversas.find((c) => c.id === conversaId);
+    const destino = stages.find((s) => s.id === destinoId);
+    if (!conversa || !destino || conversa.stage.id === destinoId) return; // mesma coluna: nada a fazer
+
+
+    const antes = conversas;
+
+
+    setErro('');
+    setConversas((atual) =>
+      atual.map((c) =>
+        c.id === conversaId ? { ...c, stage: { id: destino.id, name: destino.name, color: destino.color } } : c,
+      ),
+    );
+
+    try {
+      await api(`/conversations/${conversaId}/stage`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stageId: destinoId }),
+      });
+    } catch (e) {
+      setConversas(antes);
+      setErro(e instanceof Error ? e.message : 'Não foi possível mover a conversa.');
+    }
+  }
 
   function sair() {
     clearToken();
@@ -55,14 +103,21 @@ export default function PipelinePage() {
         </div>
       </header>
 
+      {erro && (
+        <p role="alert" className="mx-6 mt-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">
+          {erro}
+        </p>
+      )}
+
       <main className="flex-1 overflow-x-auto p-6">
-        <div className="flex items-start gap-4">
-          {stages.map((s) => (
-            <StageColumn key={s.id} stage={s} conversas={conversas.filter((c) => c.stage.id === s.id)} />
-          ))}
-        </div>
+        <DndContext sensors={sensores} onDragEnd={aoSoltar}>
+          <div className="flex items-start gap-4">
+            {stages.map((s) => (
+              <StageColumn key={s.id} stage={s} conversas={conversas.filter((c) => c.stage.id === s.id)} />
+            ))}
+          </div>
+        </DndContext>
       </main>
     </div>
   );
 }
-

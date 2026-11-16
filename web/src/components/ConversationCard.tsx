@@ -1,13 +1,17 @@
+import { useDraggable } from '@dnd-kit/core';
 import type { ConversationSummary } from '@/types';
 import { formatBRL, formatPhone, timeAgo } from '@/lib/format';
-
 
 type Props = {
   conversa: ConversationSummary;
 };
 
 export function ConversationCard({ conversa }: Props) {
-  // A API manda só a última mensagem (messages[0])
+  const { setNodeRef, listeners, attributes, transform, isDragging } = useDraggable({
+    id: conversa.id,
+  });
+
+  const estilo = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
   const ultima = conversa.messages[0];
   const previa = !ultima
     ? 'Sem mensagens'
@@ -16,7 +20,15 @@ export function ConversationCard({ conversa }: Props) {
       : `Você: ${ultima.body}`;
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <article
+      ref={setNodeRef}
+      style={estilo}
+      {...listeners}
+      {...attributes}
+      className={`cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm active:cursor-grabbing ${
+        isDragging ? 'relative z-10 opacity-80 shadow-lg ring-2 ring-green-600' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-semibold text-slate-900">{conversa.contact.name ?? 'Sem nome'}</p>
