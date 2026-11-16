@@ -8,11 +8,6 @@ import { ListConversationsDto } from './dto/list-conversations.dto';
 export class ConversationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * REGRA DE VISIBILIDADE (usada por todos os métodos):
-   *   - todo mundo só vê conversas da própria empresa;
-   *   - VENDEDOR só vê as conversas atribuídas a ele.
-   */
   private visibleTo(user: JwtPayload): Prisma.ConversationWhereInput {
     const where: Prisma.ConversationWhereInput = { organizationId: user.orgId };
     if (user.role === Role.VENDEDOR) where.assignedToId = user.sub;
@@ -72,6 +67,7 @@ export class ConversationsService {
       include: {
         contact: true,
         stage: { select: { id: true, name: true, color: true, kind: true } },
+        whatsappNumber: { select: { id: true, label: true, phone: true } },
         assignedTo: { select: { id: true, name: true } },
         messages: {
           orderBy: { createdAt: 'asc' },

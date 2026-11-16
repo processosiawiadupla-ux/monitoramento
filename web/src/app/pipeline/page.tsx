@@ -11,8 +11,9 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { api, clearToken } from '@/lib/api';
-import type { ConversationSummary, Me, Stage, UserSummary } from '@/types';
+import type { ConversationDetail, ConversationSummary, Me, Stage, UserSummary } from '@/types';
 import { StageColumn } from '@/components/StageColumn';
+import { ConversationPanel } from '@/components/ConversationPanel';
 
 export default function PipelinePage() {
   const router = useRouter();
@@ -26,12 +27,16 @@ export default function PipelinePage() {
   const [vendedorId, setVendedorId] = useState('');
   const [vendedores, setVendedores] = useState<UserSummary[]>([]);
 
+  // Qual conversa está aberta no painel (null = nenhuma)
+  const [conversaAberta, setConversaAberta] = useState<string | null>(null);
+
+  // Sensores do arrastar: mouse/toque (só depois de mover 5px) e teclado
   const sensores = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor),
   );
 
-
+  // 1) Quando a tela aparece: quem sou eu, os estágios e (se for admin/gestor) os vendedores
   useEffect(() => {
     Promise.all([api<Me>('/auth/me'), api<Stage[]>('/stages')])
       .then(async ([me, listaStages]) => {
@@ -48,12 +53,12 @@ export default function PipelinePage() {
       });
   }, [router]);
 
- 
+  // 2) Busca as conversas sempre que a busca ou o filtro mudam,
+  //    esperando 300 ms sem digitação (debounce)
   useEffect(() => {
-    if (!eu) return; 
+    if (!eu) return;
 
     const relogio = setTimeout(() => {
-      // Monta a query string: ?search=...&assignedToId=...
       const filtros = new URLSearchParams();
       if (busca.trim()) filtros.set('search', busca.trim());
       if (vendedorId) filtros.set('assignedToId', vendedorId);
@@ -67,11 +72,10 @@ export default function PipelinePage() {
         .catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar as conversas.'));
     }, 300);
 
-   
     return () => clearTimeout(relogio);
   }, [eu, busca, vendedorId]);
 
-
+  // Roda quando a pessoa SOLTA um card
   async function aoSoltar(evento: DragEndEvent) {
     const { active, over } = evento;
     if (!over) return;
@@ -100,6 +104,22 @@ export default function PipelinePage() {
       setConversas(antes);
       setErro(e instanceof Error ? e.message : 'Não foi possível mover a conversa.');
     }
+  }
+
+  // O painel avisou que a conversa mudou: atualiza o card no quadro
+  function aoAtualizarConversa(d: ConversationDetail) {
+    setConversas((atual) =>
+      atual.map((c) =>
+        c.id === d.id
+          ? {
+              ...c,
+              stage: { id: d.stage.id, name: d.stage.name, color: d.stage.color },
+              estimatedValue: d.estimatedValue,
+              assignedTo: d.assignedTo,
+            }
+          : c,
+      ),
+    );
   }
 
   function limparFiltros() {
@@ -149,7 +169,6 @@ export default function PipelinePage() {
           />
         </div>
 
-        {/* Só admin e gestor veem o filtro de vendedor */}
         {eu.role !== 'VENDEDOR' && (
           <div>
             <label htmlFor="vendedor" className="block text-xs font-medium text-slate-700">Vendedor</label>
@@ -190,11 +209,26 @@ export default function PipelinePage() {
         <DndContext sensors={sensores} onDragEnd={aoSoltar}>
           <div className="flex items-start gap-4">
             {stages.map((s) => (
-              <StageColumn key={s.id} stage={s} conversas={conversas.filter((c) => c.stage.id === s.id)} />
+              <StageColumn
+                key={s.id}
+                stage={s}
+                conversas={conversas.filter((c) => c.stage.id === s.id)}
+                onAbrir={setConversaAberta}
+              />
             ))}
           </div>
         </DndContext>
       </main>
+
+      {/* Painel da conversa (só aparece se alguma estiver aberta) */}
+      {conversaAberta && (
+        <ConversationPanel
+          conversaId={conversaAberta}
+          stages={stages}
+          onFechar={() => setConversaAberta(null)}
+          onAtualizada={aoAtualizarConversa}
+        />
+      )}
     </div>
   );
 }

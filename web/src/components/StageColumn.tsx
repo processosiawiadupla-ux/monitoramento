@@ -6,9 +6,10 @@ import { ConversationCard } from './ConversationCard';
 type Props = {
   stage: Stage;
   conversas: ConversationSummary[];
+  onAbrir: (id: string) => void; // repassado para cada card
 };
 
-export function StageColumn({ stage, conversas }: Props) {
+export function StageColumn({ stage, conversas, onAbrir }: Props) {
   // Torna a coluna um "lugar para soltar". O id é o do estágio: é assim que,
   // ao soltar, sabemos PARA ONDE a conversa foi.
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
@@ -39,7 +40,7 @@ export function StageColumn({ stage, conversas }: Props) {
           Nenhuma conversa
         </p>
       ) : (
-        conversas.map((c) => <ConversationCard key={c.id} conversa={c} />)
+        conversas.map((c) => <ConversationCard key={c.id} conversa={c} onAbrir={onAbrir} />)
       )}
     </section>
   );

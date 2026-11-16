@@ -4,14 +4,19 @@ import { formatBRL, formatPhone, timeAgo } from '@/lib/format';
 
 type Props = {
   conversa: ConversationSummary;
+  onAbrir: (id: string) => void; // abre o painel da conversa
 };
 
-export function ConversationCard({ conversa }: Props) {
+export function ConversationCard({ conversa, onAbrir }: Props) {
+  // Torna o card "pegável". O id é o da conversa: é assim que, ao soltar,
+  // sabemos QUAL conversa foi movida.
   const { setNodeRef, listeners, attributes, transform, isDragging } = useDraggable({
     id: conversa.id,
   });
 
+  // Enquanto arrasta, o card acompanha o mouse
   const estilo = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+
   const ultima = conversa.messages[0];
   const previa = !ultima
     ? 'Sem mensagens'
@@ -25,6 +30,7 @@ export function ConversationCard({ conversa }: Props) {
       style={estilo}
       {...listeners}
       {...attributes}
+      onClick={() => onAbrir(conversa.id)}
       className={`cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm active:cursor-grabbing ${
         isDragging ? 'relative z-10 opacity-80 shadow-lg ring-2 ring-green-600' : ''
       }`}
