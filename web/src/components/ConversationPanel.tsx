@@ -6,11 +6,12 @@ import type { ConversationDetail, Stage, StageChangeItem } from '@/types';
 type Props = {
   conversaId: string;
   stages: Stage[];
+  versao: number;
   onFechar: () => void;
   onAtualizada: (conversa: ConversationDetail) => void; // avisa a página que algo mudou
 };
 
-export function ConversationPanel({ conversaId, stages, onFechar, onAtualizada }: Props) {
+export function ConversationPanel({ conversaId, stages, versao, onFechar, onAtualizada }: Props) {
   const [conversa, setConversa] = useState<ConversationDetail | null>(null);
   const [historico, setHistorico] = useState<StageChangeItem[]>([]);
   const [valor, setValor] = useState('');
@@ -19,9 +20,14 @@ export function ConversationPanel({ conversaId, stages, onFechar, onAtualizada }
   const fimDasMensagens = useRef<HTMLDivElement>(null);
 
   // Busca a conversa e o histórico sempre que abrir uma conversa diferente
+  // Quando abre OUTRA conversa: limpa a tela
   useEffect(() => {
     setConversa(null);
     setErro('');
+  }, [conversaId]);
+
+  // Busca a conversa e o histórico: ao abrir e a cada aviso do tempo real
+  useEffect(() => {
     Promise.all([
       api<ConversationDetail>(`/conversations/${conversaId}`),
       api<StageChangeItem[]>(`/conversations/${conversaId}/history`),
@@ -32,7 +38,7 @@ export function ConversationPanel({ conversaId, stages, onFechar, onAtualizada }
         setValor(detalhe.estimatedValue ?? '');
       })
       .catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível abrir a conversa.'));
-  }, [conversaId]);
+  }, [conversaId, versao]);
 
   // Rola as mensagens até a mais recente
   useEffect(() => {

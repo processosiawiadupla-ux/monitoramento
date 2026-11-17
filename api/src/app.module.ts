@@ -1,7 +1,8 @@
 import { ConversationsModule } from './conversations/conversations.module';
-
+import { RealtimeModule } from './realtime/realtime.module';
 import { UsersModule } from './users/users.module';
 import { StagesModule } from './stages/stages.module';
+
 
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -23,6 +24,7 @@ import { RolesGuard } from './auth/roles.guard';
     UsersModule,
     StagesModule,
     ConversationsModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [

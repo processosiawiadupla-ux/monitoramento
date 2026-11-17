@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DndContext,
@@ -11,6 +11,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { api, clearToken } from '@/lib/api';
+import { conectarTempoReal } from '@/lib/realtime';
 import type { ConversationDetail, ConversationSummary, Me, Stage, UserSummary } from '@/types';
 import { StageColumn } from '@/components/StageColumn';
 import { ConversationPanel } from '@/components/ConversationPanel';
@@ -27,10 +28,20 @@ export default function PipelinePage() {
   const [vendedorId, setVendedorId] = useState('');
   const [vendedores, setVendedores] = useState<UserSummary[]>([]);
 
-  // Qual conversa está aberta no painel (null = nenhuma)
+  // Painel da conversa
   const [conversaAberta, setConversaAberta] = useState<string | null>(null);
 
-  // Sensores do arrastar: mouse/toque (só depois de mover 5px) e teclado
+  // Tempo real
+  const [aoVivo, setAoVivo] = useState(false);        // a linha está conectada?
+  const [versaoLista, setVersaoLista] = useState(0);   // muda a cada aviso: recarrega a lista
+  const [versaoPainel, setVersaoPainel] = useState(0); // muda quando o aviso é da conversa aberta
+  const conversaAbertaRef = useRef<string | null>(null);
+
+  // Mantém o "ref" sempre com a conversa aberta atual (usado dentro do aviso)
+  useEffect(() => {
+    conversaAbertaRef.current = conversaAberta;
+  }, [conversaAberta]);
+
   const sensores = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor),
@@ -53,8 +64,29 @@ export default function PipelinePage() {
       });
   }, [router]);
 
-  // 2) Busca as conversas sempre que a busca ou o filtro mudam,
-  //    esperando 300 ms sem digitação (debounce)
+  // 2) Abre a linha de tempo real assim que sabemos quem é o usuário
+  useEffect(() => {
+    if (!eu) return;
+
+    const socket = conectarTempoReal();
+    socket.on('connect', () => setAoVivo(true));
+    socket.on('disconnect', () => setAoVivo(false));
+
+    // Aviso: "a conversa X mudou"
+    socket.on('conversation.changed', (aviso: { id: string }) => {
+      setVersaoLista((v) => v + 1); // recarrega o quadro
+      if (aviso.id === conversaAbertaRef.current) {
+        setVersaoPainel((v) => v + 1); // recarrega o painel, se for a conversa aberta
+      }
+    });
+
+    // Ao sair da página: desliga a linha
+    return () => {
+      socket.disconnect();
+    };
+  }, [eu]);
+
+  // 3) Busca as conversas: ao mudar a busca, o filtro ou ao chegar um aviso
   useEffect(() => {
     if (!eu) return;
 
@@ -73,9 +105,8 @@ export default function PipelinePage() {
     }, 300);
 
     return () => clearTimeout(relogio);
-  }, [eu, busca, vendedorId]);
+  }, [eu, busca, vendedorId, versaoLista]);
 
-  // Roda quando a pessoa SOLTA um card
   async function aoSoltar(evento: DragEndEvent) {
     const { active, over } = evento;
     if (!over) return;
@@ -106,7 +137,6 @@ export default function PipelinePage() {
     }
   }
 
-  // O painel avisou que a conversa mudou: atualiza o card no quadro
   function aoAtualizarConversa(d: ConversationDetail) {
     setConversas((atual) =>
       atual.map((c) =>
@@ -146,6 +176,10 @@ export default function PipelinePage() {
           <p className="text-xs text-slate-500">{eu.organization.name}</p>
         </div>
         <div className="flex items-center gap-4">
+          <span className="flex items-center gap-2 text-xs text-slate-600">
+            <span className={`h-2 w-2 rounded-full ${aoVivo ? 'bg-green-600' : 'bg-slate-400'}`} />
+            {aoVivo ? 'Ao vivo' : 'Reconectando...'}
+          </span>
           <span className="text-sm text-slate-700">
             {eu.name} · {eu.role}
           </span>
@@ -155,7 +189,6 @@ export default function PipelinePage() {
         </div>
       </header>
 
-      {/* Barra de busca e filtro */}
       <div className="flex flex-wrap items-end gap-4 border-b border-slate-200 bg-white px-6 py-3">
         <div>
           <label htmlFor="busca" className="block text-xs font-medium text-slate-700">Buscar</label>
@@ -220,11 +253,11 @@ export default function PipelinePage() {
         </DndContext>
       </main>
 
-      {/* Painel da conversa (só aparece se alguma estiver aberta) */}
       {conversaAberta && (
         <ConversationPanel
           conversaId={conversaAberta}
           stages={stages}
+          versao={versaoPainel}
           onFechar={() => setConversaAberta(null)}
           onAtualizada={aoAtualizarConversa}
         />
@@ -232,4 +265,3 @@ export default function PipelinePage() {
     </div>
   );
 }
-

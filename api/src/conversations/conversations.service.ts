@@ -1,13 +1,22 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import type { JwtPayload } from '../auth/auth.types';
 import { ListConversationsDto } from './dto/list-conversations.dto';
 
 @Injectable()
 export class ConversationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeGateway, // para avisar as telas abertas
+  ) {}
 
+  /**
+   * REGRA DE VISIBILIDADE (usada por todos os métodos):
+   *   - todo mundo só vê conversas da própria empresa;
+   *   - VENDEDOR só vê as conversas atribuídas a ele.
+   */
   private visibleTo(user: JwtPayload): Prisma.ConversationWhereInput {
     const where: Prisma.ConversationWhereInput = { organizationId: user.orgId };
     if (user.role === Role.VENDEDOR) where.assignedToId = user.sub;
@@ -18,7 +27,7 @@ export class ConversationsService {
   private async ensureVisible(user: JwtPayload, id: string) {
     const conversa = await this.prisma.conversation.findFirst({
       where: { id, ...this.visibleTo(user) },
-      select: { id: true, stageId: true },
+      select: { id: true, stageId: true, assignedToId: true },
     });
     if (!conversa) throw new NotFoundException('Conversa não encontrada.');
     return conversa;
@@ -93,22 +102,19 @@ export class ConversationsService {
     });
   }
 
-  // ---------------- ALTERAÇÕES ----------------
+  // ---------------- ALTERAÇÕES (todas avisam o tempo real) ----------------
 
   /** Move a conversa para outro estágio e grava no histórico. */
   async moveStage(user: JwtPayload, id: string, stageId: string) {
     const conversa = await this.ensureVisible(user, id);
 
-    // Já está nesse estágio? Não faz nada.
     if (conversa.stageId === stageId) return this.findOne(user, id);
 
-    // O estágio de destino precisa ser da MESMA empresa
     const destino = await this.prisma.stage.findFirst({
-            where: { id: stageId, organizationId: user.orgId, archived: false },
+      where: { id: stageId, organizationId: user.orgId, archived: false },
     });
     if (!destino) throw new BadRequestException('Estágio de destino inválido.');
 
-    // Transação: as duas gravações acontecem juntas, ou nenhuma acontece.
     await this.prisma.$transaction([
       this.prisma.conversation.update({
         where: { id },
@@ -124,12 +130,14 @@ export class ConversationsService {
       }),
     ]);
 
+    // Avisa: gestão + vendedora dona da conversa
+    this.realtime.conversaMudou(user.orgId, id, [conversa.assignedToId]);
     return this.findOne(user, id);
   }
 
   /** Atribui (ou remove) o vendedor responsável. Só ADMIN e GESTOR (controle no controller). */
   async assign(user: JwtPayload, id: string, assignedToId: string | null) {
-    await this.ensureVisible(user, id);
+    const conversa = await this.ensureVisible(user, id);
 
     if (assignedToId) {
       const vendedor = await this.prisma.user.findFirst({
@@ -142,16 +150,21 @@ export class ConversationsService {
       where: { id },
       data: { assignedToId: assignedToId ?? null },
     });
+
+    // Avisa o vendedor antigo (a conversa sai da tela dele) e o novo (ela aparece)
+    this.realtime.conversaMudou(user.orgId, id, [conversa.assignedToId, assignedToId]);
     return this.findOne(user, id);
   }
 
   /** Atualiza o valor estimado da venda. */
   async update(user: JwtPayload, id: string, estimatedValue: number | null | undefined) {
-    await this.ensureVisible(user, id);
+    const conversa = await this.ensureVisible(user, id);
     await this.prisma.conversation.update({
       where: { id },
       data: { estimatedValue },
     });
+
+    this.realtime.conversaMudou(user.orgId, id, [conversa.assignedToId]);
     return this.findOne(user, id);
   }
 }
