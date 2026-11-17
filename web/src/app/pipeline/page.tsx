@@ -31,13 +31,13 @@ export default function PipelinePage() {
   // Painel da conversa
   const [conversaAberta, setConversaAberta] = useState<string | null>(null);
 
-  // Tempo real
-  const [aoVivo, setAoVivo] = useState(false);        // a linha está conectada?
-  const [versaoLista, setVersaoLista] = useState(0);   // muda a cada aviso: recarrega a lista
-  const [versaoPainel, setVersaoPainel] = useState(0); // muda quando o aviso é da conversa aberta
+  
+  const [aoVivo, setAoVivo] = useState(false);       
+  const [versaoLista, setVersaoLista] = useState(0);   
+  const [versaoPainel, setVersaoPainel] = useState(0); 
   const conversaAbertaRef = useRef<string | null>(null);
 
-  // Mantém o "ref" sempre com a conversa aberta atual (usado dentro do aviso)
+
   useEffect(() => {
     conversaAbertaRef.current = conversaAberta;
   }, [conversaAberta]);
@@ -47,7 +47,7 @@ export default function PipelinePage() {
     useSensor(KeyboardSensor),
   );
 
-  // 1) Quando a tela aparece: quem sou eu, os estágios e (se for admin/gestor) os vendedores
+
   useEffect(() => {
     Promise.all([api<Me>('/auth/me'), api<Stage[]>('/stages')])
       .then(async ([me, listaStages]) => {
