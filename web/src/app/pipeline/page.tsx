@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   DndContext,
@@ -31,13 +32,13 @@ export default function PipelinePage() {
   // Painel da conversa
   const [conversaAberta, setConversaAberta] = useState<string | null>(null);
 
-  
-  const [aoVivo, setAoVivo] = useState(false);       
-  const [versaoLista, setVersaoLista] = useState(0);   
-  const [versaoPainel, setVersaoPainel] = useState(0); 
+  // Tempo real
+  const [aoVivo, setAoVivo] = useState(false);        // a linha está conectada?
+  const [versaoLista, setVersaoLista] = useState(0);   // muda a cada aviso: recarrega a lista
+  const [versaoPainel, setVersaoPainel] = useState(0); // muda quando o aviso é da conversa aberta
   const conversaAbertaRef = useRef<string | null>(null);
 
-
+  // Mantém o "ref" sempre com a conversa aberta atual (usado dentro do aviso)
   useEffect(() => {
     conversaAbertaRef.current = conversaAberta;
   }, [conversaAberta]);
@@ -47,7 +48,7 @@ export default function PipelinePage() {
     useSensor(KeyboardSensor),
   );
 
-
+  // 1) Quando a tela aparece: quem sou eu, os estágios e (se for admin/gestor) os vendedores
   useEffect(() => {
     Promise.all([api<Me>('/auth/me'), api<Stage[]>('/stages')])
       .then(async ([me, listaStages]) => {
@@ -180,6 +181,19 @@ export default function PipelinePage() {
             <span className={`h-2 w-2 rounded-full ${aoVivo ? 'bg-green-600' : 'bg-slate-400'}`} />
             {aoVivo ? 'Ao vivo' : 'Reconectando...'}
           </span>
+
+          {/* Links de administração */}
+          {eu.role !== 'VENDEDOR' && (
+            <Link href="/admin/usuarios" className="text-sm text-slate-700 underline hover:text-slate-900">
+              Usuários
+            </Link>
+          )}
+          {eu.role === 'ADMIN' && (
+            <Link href="/admin/estagios" className="text-sm text-slate-700 underline hover:text-slate-900">
+              Estágios
+            </Link>
+          )}
+
           <span className="text-sm text-slate-700">
             {eu.name} · {eu.role}
           </span>
