@@ -1,18 +1,19 @@
 import { Role } from '@prisma/client';
-import { IsEmail, IsEnum, IsString, Length, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
-  @Length(2, 100, { message: 'O nome precisa ter entre 2 e 100 caracteres.' })
+  @MinLength(2, { message: 'Informe o nome.' })
+  @MaxLength(80)
   name!: string;
 
-  @IsEmail({}, { message: 'Informe um e-mail válido.' })
+  @IsEmail({}, { message: 'E-mail inválido.' })
   email!: string;
 
   @IsString()
   @MinLength(8, { message: 'A senha precisa ter pelo menos 8 caracteres.' })
   password!: string;
 
-  @IsEnum(Role, { message: 'Papel inválido. Use ADMIN, GESTOR ou VENDEDOR.' })
+  @IsEnum(Role, { message: 'Papel inválido.' })
   role!: Role;
 }

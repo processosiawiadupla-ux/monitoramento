@@ -16,6 +16,7 @@ export type UserSummary = {
   email: string;
   role: Role;
   active: boolean;
+  createdAt: string;
 };
 
 export type Stage = {
