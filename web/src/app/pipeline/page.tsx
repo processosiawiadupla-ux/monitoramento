@@ -193,6 +193,11 @@ export default function PipelinePage() {
               Estágios
             </Link>
           )}
+          {eu.role === 'ADMIN' && (
+          <Link href="/admin/numeros" className="text-sm text-slate-700 underline hover:text-slate-900">
+            Números
+          </Link>
+        )}
 
           <span className="text-sm text-slate-700">
             {eu.name} · {eu.role}

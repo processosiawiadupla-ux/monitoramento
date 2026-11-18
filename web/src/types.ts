@@ -69,3 +69,14 @@ export type StageChangeItem = {
   toStage: { name: string };
   changedBy: { name: string } | null;
 };
+
+export type WhatsAppNumberItem = {
+  id: string;
+  phone: string;
+  label: string;
+  active: boolean;
+  createdAt: string;
+  owner: { id: string; name: string } | null;
+  _count: { conversations: number };
+};
+

@@ -18,7 +18,7 @@ const STAGES = [
 const minutosAtras = (min: number) => new Date(Date.now() - min * 60_000);
 
 async function main() {
-  const DEMO = 'Wiaflow Demo';
+  const DEMO = '';
   const senha = 'admin12345';
 
   // ---------- Apaga a empresa demo anterior ----------
