@@ -185,3 +185,61 @@ Content-Type: application/json
   "name": "Nome da Ana"
 }
 
+### SIMULADOR 1: cliente NOVO manda mensagem para o número da Ana
+POST http://localhost:3333/api/dev/simular-mensagem
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "numeroEmpresa": "5511900000001",
+  "telefoneCliente": "5511955554444",
+  "nomeContato": "Cliente Teste",
+  "texto": "Oi! Vi o anúncio, quanto custa?"
+}
+
+### SIMULADOR 2: o MESMO cliente manda outra mensagem
+POST http://localhost:3333/api/dev/simular-mensagem
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "numeroEmpresa": "5511900000001",
+  "telefoneCliente": "5511955554444",
+  "texto": "Vocês parcelam?"
+}
+
+### SIMULADOR 3: a Ana responde pelo celular (o "eco")
+POST http://localhost:3333/api/dev/simular-mensagem
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "numeroEmpresa": "5511900000001",
+  "telefoneCliente": "5511955554444",
+  "texto": "Parcelamos em até 10x sem juros!",
+  "direcao": "SAIDA_APP"
+}
+
+### SIMULADOR 4: cliente novo no número do BRUNO
+POST http://localhost:3333/api/dev/simular-mensagem
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "numeroEmpresa": "5511900000002",
+  "telefoneCliente": "5511933332222",
+  "nomeContato": "Cliente do Bruno",
+  "texto": "Bom dia, tudo bem?"
+}
+
+### SIMULADOR 5: número da empresa que NÃO existe
+POST http://localhost:3333/api/dev/simular-mensagem
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "numeroEmpresa": "5599999999999",
+  "telefoneCliente": "5511911112222",
+  "texto": "Alguém aí?"
+}
+

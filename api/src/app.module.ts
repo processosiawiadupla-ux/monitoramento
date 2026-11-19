@@ -1,3 +1,4 @@
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { WhatsappNumbersModule } from './whatsapp-numbers/whatsapp-numbers.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { RealtimeModule } from './realtime/realtime.module';
@@ -27,6 +28,7 @@ import { RolesGuard } from './auth/roles.guard';
     ConversationsModule,
     RealtimeModule,
     WhatsappNumbersModule,
+    WhatsappModule,
   ],
   controllers: [AppController],
   providers: [
