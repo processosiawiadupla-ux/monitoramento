@@ -43,6 +43,7 @@ enum RuleTrigger {
 model Organization {
   id              String           @id @default(cuid())
   name            String
+  responseAlertMinutes Int              @default(30)
   createdAt       DateTime         @default(now())
 
   users           User[]

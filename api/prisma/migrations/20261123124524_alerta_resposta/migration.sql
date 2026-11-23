@@ -1,0 +1,1 @@
+ALTER TABLE "Organization" ADD COLUMN "responseAlertMinutes" INTEGER NOT NULL DEFAULT 30;

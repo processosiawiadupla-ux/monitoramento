@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -13,7 +13,8 @@ import {
 } from '@dnd-kit/core';
 import { api, clearToken } from '@/lib/api';
 import { conectarTempoReal } from '@/lib/realtime';
-import type { ConversationDetail, ConversationSummary, Me, Stage, UserSummary } from '@/types';
+import { minutosAguardando } from '@/lib/alerta';
+import type { ConversationDetail, ConversationSummary, Me, Settings, Stage, UserSummary } from '@/types';
 import { StageColumn } from '@/components/StageColumn';
 import { ConversationPanel } from '@/components/ConversationPanel';
 
@@ -28,32 +29,43 @@ export default function PipelinePage() {
   const [busca, setBusca] = useState('');
   const [vendedorId, setVendedorId] = useState('');
   const [vendedores, setVendedores] = useState<UserSummary[]>([]);
+  const [soSemResposta, setSoSemResposta] = useState(false);
 
   // Painel da conversa
   const [conversaAberta, setConversaAberta] = useState<string | null>(null);
 
   // Tempo real
-  const [aoVivo, setAoVivo] = useState(false);        // a linha está conectada?
-  const [versaoLista, setVersaoLista] = useState(0);   // muda a cada aviso: recarrega a lista
-  const [versaoPainel, setVersaoPainel] = useState(0); // muda quando o aviso é da conversa aberta
+  const [aoVivo, setAoVivo] = useState(false);
+  const [versaoLista, setVersaoLista] = useState(0);
+  const [versaoPainel, setVersaoPainel] = useState(0);
   const conversaAbertaRef = useRef<string | null>(null);
 
-  // Mantém o "ref" sempre com a conversa aberta atual (usado dentro do aviso)
+  // Alerta de "sem resposta"
+  const [limite, setLimite] = useState(30);               // minutos, vem da empresa
+  const [agora, setAgora] = useState(() => Date.now());   // o "relógio" da tela
+
   useEffect(() => {
     conversaAbertaRef.current = conversaAberta;
   }, [conversaAberta]);
+
+  // O relógio: bate a cada 30 segundos e faz os tempos de espera andarem
+  useEffect(() => {
+    const relogio = setInterval(() => setAgora(Date.now()), 30_000);
+    return () => clearInterval(relogio);
+  }, []);
 
   const sensores = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor),
   );
 
-  // 1) Quando a tela aparece: quem sou eu, os estágios e (se for admin/gestor) os vendedores
+  // 1) Quando a tela aparece: quem sou eu, estágios, limite do alerta e vendedores
   useEffect(() => {
-    Promise.all([api<Me>('/auth/me'), api<Stage[]>('/stages')])
-      .then(async ([me, listaStages]) => {
+    Promise.all([api<Me>('/auth/me'), api<Stage[]>('/stages'), api<Settings>('/settings')])
+      .then(async ([me, listaStages, config]) => {
         setEu(me);
         setStages(listaStages);
+        setLimite(config.responseAlertMinutes);
         if (me.role !== 'VENDEDOR') {
           const usuarios = await api<UserSummary[]>('/users');
           setVendedores(usuarios.filter((u) => u.role === 'VENDEDOR' && u.active));
@@ -65,29 +77,24 @@ export default function PipelinePage() {
       });
   }, [router]);
 
-  // 2) Abre a linha de tempo real assim que sabemos quem é o usuário
+  // 2) Tempo real
   useEffect(() => {
     if (!eu) return;
 
     const socket = conectarTempoReal();
     socket.on('connect', () => setAoVivo(true));
     socket.on('disconnect', () => setAoVivo(false));
-
-    // Aviso: "a conversa X mudou"
     socket.on('conversation.changed', (aviso: { id: string }) => {
-      setVersaoLista((v) => v + 1); // recarrega o quadro
-      if (aviso.id === conversaAbertaRef.current) {
-        setVersaoPainel((v) => v + 1); // recarrega o painel, se for a conversa aberta
-      }
+      setVersaoLista((v) => v + 1);
+      if (aviso.id === conversaAbertaRef.current) setVersaoPainel((v) => v + 1);
     });
 
-    // Ao sair da página: desliga a linha
     return () => {
       socket.disconnect();
     };
   }, [eu]);
 
-  // 3) Busca as conversas: ao mudar a busca, o filtro ou ao chegar um aviso
+  // 3) Busca as conversas
   useEffect(() => {
     if (!eu) return;
 
@@ -107,6 +114,20 @@ export default function PipelinePage() {
 
     return () => clearTimeout(relogio);
   }, [eu, busca, vendedorId, versaoLista]);
+
+  // Quem está aguardando resposta, e há quanto tempo (refeito a cada batida do relógio)
+  const esperas = useMemo(() => {
+    const abertos = new Set(stages.filter((s) => s.kind === 'OPEN').map((s) => s.id));
+    const mapa = new Map<string, number>();
+    for (const c of conversas) {
+      if (!abertos.has(c.stage.id)) continue; // ganha ou perdida: não alerta
+      const minutos = minutosAguardando(c, agora);
+      if (minutos !== null) mapa.set(c.id, minutos);
+    }
+    return mapa;
+  }, [conversas, stages, agora]);
+
+  const atrasadas = [...esperas.values()].filter((m) => m >= limite).length;
 
   async function aoSoltar(evento: DragEndEvent) {
     const { active, over } = evento;
@@ -156,6 +177,7 @@ export default function PipelinePage() {
   function limparFiltros() {
     setBusca('');
     setVendedorId('');
+    setSoSemResposta(false);
   }
 
   function sair() {
@@ -167,7 +189,8 @@ export default function PipelinePage() {
     return <p className="p-8 text-slate-600">Carregando...</p>;
   }
 
-  const temFiltro = busca.trim() !== '' || vendedorId !== '';
+  const temFiltro = busca.trim() !== '' || vendedorId !== '' || soSemResposta;
+  const visiveis = soSemResposta ? conversas.filter((c) => esperas.has(c.id)) : conversas;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -177,32 +200,30 @@ export default function PipelinePage() {
           <p className="text-xs text-slate-500">{eu.organization.name}</p>
         </div>
         <div className="flex items-center gap-4">
+          {atrasadas > 0 && (
+            <button
+              onClick={() => setSoSemResposta(true)}
+              className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800 hover:bg-red-200"
+            >
+              🔴 {atrasadas} sem resposta
+            </button>
+          )}
           <span className="flex items-center gap-2 text-xs text-slate-600">
             <span className={`h-2 w-2 rounded-full ${aoVivo ? 'bg-green-600' : 'bg-slate-400'}`} />
             {aoVivo ? 'Ao vivo' : 'Reconectando...'}
           </span>
 
-          {/* Links de administração */}
           {eu.role !== 'VENDEDOR' && (
-            <Link href="/admin/usuarios" className="text-sm text-slate-700 underline hover:text-slate-900">
-              Usuários
-            </Link>
+            <Link href="/admin/usuarios" className="text-sm text-slate-700 underline hover:text-slate-900">Usuários</Link>
           )}
           {eu.role === 'ADMIN' && (
-            <Link href="/admin/estagios" className="text-sm text-slate-700 underline hover:text-slate-900">
-              Estágios
-            </Link>
+            <>
+              <Link href="/admin/estagios" className="text-sm text-slate-700 underline hover:text-slate-900">Estágios</Link>
+              <Link href="/admin/numeros" className="text-sm text-slate-700 underline hover:text-slate-900">Números</Link>
+              <Link href="/admin/regras" className="text-sm text-slate-700 underline hover:text-slate-900">Regras</Link>
+            </>
           )}
-          {eu.role === 'ADMIN' && (
-          <Link href="/admin/numeros" className="text-sm text-slate-700 underline hover:text-slate-900">
-            Números
-          </Link>
-        )}
-    {eu.role === 'ADMIN' && (
-  <Link href="/admin/regras" className="text-sm text-slate-700 underline hover:text-slate-900">
-    Regras
-  </Link>
-)}
+
           <span className="text-sm text-slate-700">
             {eu.name} · {eu.role}
           </span>
@@ -236,13 +257,16 @@ export default function PipelinePage() {
             >
               <option value="">Todos</option>
               {vendedores.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
+                <option key={v.id} value={v.id}>{v.name}</option>
               ))}
             </select>
           </div>
         )}
+
+        <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
+          <input type="checkbox" checked={soSemResposta} onChange={(e) => setSoSemResposta(e.target.checked)} />
+          Só aguardando resposta
+        </label>
 
         {temFiltro && (
           <button onClick={limparFiltros} className="rounded-lg px-3 py-2 text-sm text-slate-700 underline hover:text-slate-900">
@@ -251,7 +275,7 @@ export default function PipelinePage() {
         )}
 
         <span className="ml-auto text-sm text-slate-600">
-          {conversas.length} {conversas.length === 1 ? 'conversa' : 'conversas'}
+          {visiveis.length} {visiveis.length === 1 ? 'conversa' : 'conversas'} · alerta após {limite} min
         </span>
       </div>
 
@@ -268,8 +292,10 @@ export default function PipelinePage() {
               <StageColumn
                 key={s.id}
                 stage={s}
-                conversas={conversas.filter((c) => c.stage.id === s.id)}
+                conversas={visiveis.filter((c) => c.stage.id === s.id)}
                 onAbrir={setConversaAberta}
+                esperas={esperas}
+                limite={limite}
               />
             ))}
           </div>

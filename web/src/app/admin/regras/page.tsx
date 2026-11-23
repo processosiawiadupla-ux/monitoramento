@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, clearToken } from '@/lib/api';
-import type { Me, RuleTrigger, Stage, StageRuleItem } from '@/types';
+import type { Me, RuleTrigger, Settings, Stage, StageRuleItem } from '@/types';
 
 const TIPOS: { valor: RuleTrigger; nome: string }[] = [
   { valor: 'INBOUND_KEYWORD', nome: 'Cliente escreve...' },
@@ -25,6 +25,7 @@ export default function RegrasPage() {
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
   const [excluindo, setExcluindo] = useState<string | null>(null);
+  const [limiteAlerta, setLimiteAlerta] = useState('');
 
   // Nova regra
   const [nome, setNome] = useState('');
@@ -33,12 +34,14 @@ export default function RegrasPage() {
   const [palavras, setPalavras] = useState('');
 
   const carregar = useCallback(async () => {
-    const [lista, listaEstagios] = await Promise.all([
+    const [lista, listaEstagios, config] = await Promise.all([
       api<StageRuleItem[]>('/stage-rules'),
       api<Stage[]>('/stages'),
+      api<Settings>('/settings'),
     ]);
     setRegras(lista);
     setEstagios(listaEstagios);
+    setLimiteAlerta(String(config.responseAlertMinutes));
   }, []);
 
   // Só ADMIN entra aqui
@@ -81,7 +84,10 @@ export default function RegrasPage() {
     }
   }
 
-  function salvar(regra: StageRuleItem, dados: Partial<Pick<StageRuleItem, 'name' | 'trigger' | 'toStageId' | 'keywords' | 'active'>>) {
+  function salvar(
+    regra: StageRuleItem,
+    dados: Partial<Pick<StageRuleItem, 'name' | 'trigger' | 'toStageId' | 'keywords' | 'active'>>,
+  ) {
     if (dados.name !== undefined) {
       dados.name = dados.name.trim();
       if (!dados.name || dados.name === regra.name) return;
@@ -113,6 +119,20 @@ export default function RegrasPage() {
     }
   }
 
+  async function salvarLimite() {
+    limparAvisos();
+    try {
+      const config = await api<Settings>('/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ responseAlertMinutes: Number(limiteAlerta) }),
+      });
+      setLimiteAlerta(String(config.responseAlertMinutes));
+      setAviso('Limite do alerta salvo.');
+    } catch (falha) {
+      setErro(falha instanceof Error ? falha.message : 'Não foi possível salvar o limite.');
+    }
+  }
+
   if (!eu) return <p className="p-8 text-slate-600">Carregando...</p>;
 
   return (
@@ -139,6 +159,28 @@ export default function RegrasPage() {
             <li>Maiúsculas e acentos não importam: &quot;orçamento&quot; e &quot;ORCAMENTO&quot; são a mesma palavra.</li>
             <li>Separe as palavras por vírgula. Toda mudança vale a partir da próxima mensagem.</li>
           </ul>
+        </div>
+
+        {/* Limite do alerta de "sem resposta" */}
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+          <label className="text-sm text-slate-700">
+            Alerta de &quot;sem resposta&quot; depois de
+            <input
+              type="number"
+              min={1}
+              max={1440}
+              value={limiteAlerta}
+              onChange={(e) => setLimiteAlerta(e.target.value)}
+              className="mx-2 mt-1 w-24 rounded-lg border border-slate-300 px-3 py-2 text-slate-900"
+            />
+            minutos
+          </label>
+          <button
+            onClick={salvarLimite}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            Salvar limite
+          </button>
         </div>
 
         {/* Lista de regras */}
@@ -199,13 +241,22 @@ export default function RegrasPage() {
                     </button>
                     {excluindo === r.id ? (
                       <>
-                        <button onClick={() => { setExcluindo(null); void enviar(`/stage-rules/${r.id}`, 'DELETE', undefined, 'Regra excluída.'); }}
-                          className="rounded-md bg-red-700 px-2 py-1 text-xs text-white">Confirmar</button>
+                        <button
+                          onClick={() => {
+                            setExcluindo(null);
+                            void enviar(`/stage-rules/${r.id}`, 'DELETE', undefined, 'Regra excluída.');
+                          }}
+                          className="rounded-md bg-red-700 px-2 py-1 text-xs text-white"
+                        >
+                          Confirmar
+                        </button>
                         <button onClick={() => setExcluindo(null)} className="text-xs underline">Cancelar</button>
                       </>
                     ) : (
                       <button onClick={() => setExcluindo(r.id)}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100">Excluir</button>
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100">
+                        Excluir
+                      </button>
                     )}
                   </div>
                 </div>

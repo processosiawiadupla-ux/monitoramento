@@ -1,5 +1,3 @@
-// O formato dos dados que vêm da API (o mesmo que aparece no requests.http)
-
 export type Role = 'ADMIN' | 'GESTOR' | 'VENDEDOR';
 
 export type Me = {
@@ -36,6 +34,8 @@ export type ConversationSummary = {
   stage: { id: string; name: string; color: string };
   assignedTo: { id: string; name: string } | null;
   messages: { body: string; author: 'CONTACT' | 'USER' | 'BOT'; createdAt: string }[];
+  lastInboundAt: string | null;
+  lastOutboundAt: string | null;
 };
 
 // Uma mensagem completa (o que vem no GET /conversations/:id)
@@ -94,3 +94,4 @@ export type StageRuleItem = {
   toStage: { id: string; name: string; color: string };
 };
 
+export type Settings = { responseAlertMinutes: number };

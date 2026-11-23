@@ -15,6 +15,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { WhatsappNumbersModule } from './whatsapp-numbers/whatsapp-numbers.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { StageRulesModule } from './stage-rules/stage-rules.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { StageRulesModule } from './stage-rules/stage-rules.module';
     WhatsappNumbersModule,
     WhatsappModule,
     StageRulesModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [

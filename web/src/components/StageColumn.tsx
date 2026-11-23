@@ -1,17 +1,20 @@
+'use client';
+
 import { useDroppable } from '@dnd-kit/core';
-import type { ConversationSummary, Stage } from '@/types';
 import { formatBRL } from '@/lib/format';
+import type { ConversationSummary, Stage } from '@/types';
 import { ConversationCard } from './ConversationCard';
 
 type Props = {
   stage: Stage;
   conversas: ConversationSummary[];
-  onAbrir: (id: string) => void; // repassado para cada card
+  onAbrir: (id: string) => void;
+  /** id da conversa → minutos aguardando (só as que estão aguardando) */
+  esperas: Map<string, number>;
+  limite: number;
 };
 
-export function StageColumn({ stage, conversas, onAbrir }: Props) {
-  // Torna a coluna um "lugar para soltar". O id é o do estágio: é assim que,
-  // ao soltar, sabemos PARA ONDE a conversa foi.
+export function StageColumn({ stage, conversas, onAbrir, esperas, limite }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
 
   const total = conversas.reduce((soma, c) => soma + Number(c.estimatedValue ?? 0), 0);
@@ -19,29 +22,29 @@ export function StageColumn({ stage, conversas, onAbrir }: Props) {
   return (
     <section
       ref={setNodeRef}
-      aria-label={stage.name}
-      className={`flex w-72 shrink-0 flex-col gap-3 rounded-xl p-3 transition-colors ${
-        isOver ? 'bg-green-100 ring-2 ring-green-600' : 'bg-slate-100'
-      }`}
+      className={`flex w-72 shrink-0 flex-col rounded-xl bg-slate-100 p-3 ${isOver ? 'ring-2 ring-slate-400' : ''}`}
     >
-      <header>
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
-            {stage.name}
-          </h2>
-          <span className="rounded-full bg-white px-2 text-xs font-semibold text-slate-700">{conversas.length}</span>
+      <header className="mb-3">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
+          <h2 className="text-sm font-semibold text-slate-900">{stage.name}</h2>
+          <span className="ml-auto rounded-full bg-white px-2 text-xs text-slate-600">{conversas.length}</span>
         </div>
-        <p className="mt-1 text-xs text-slate-500">{total > 0 ? formatBRL(total) : 'Sem valor estimado'}</p>
+        <p className="mt-1 text-xs text-slate-500">{formatBRL(total)}</p>
       </header>
 
-      {conversas.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">
-          Nenhuma conversa
-        </p>
-      ) : (
-        conversas.map((c) => <ConversationCard key={c.id} conversa={c} onAbrir={onAbrir} />)
-      )}
+      <div className="flex flex-col gap-2">
+        {conversas.length === 0 && <p className="py-4 text-center text-xs text-slate-500">Nenhuma conversa</p>}
+        {conversas.map((c) => (
+          <ConversationCard
+            key={c.id}
+            conversa={c}
+            onAbrir={onAbrir}
+            espera={esperas.get(c.id) ?? null}
+            limite={limite}
+          />
+        ))}
+      </div>
     </section>
   );
 }

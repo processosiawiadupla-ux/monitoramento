@@ -245,4 +245,16 @@ Content-Type: application/json
   "telefoneCliente": "5511911112222",
   "texto": "Alguém aí?"
 }
+### ALERTA 1: cliente novo manda mensagem (número da Ana)
+POST http://localhost:3333/api/dev/simular-mensagem
+Authorization: Bearer {{token}}
+Content-Type: application/json
 
+{ "numeroEmpresa": "5511900000001", "telefoneCliente": "5511911110000", "nomeContato": "Cliente Alerta", "texto": "Oi, tudo bem?" }
+
+### ALERTA 2: a Ana responde
+POST http://localhost:3333/api/dev/simular-mensagem
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "numeroEmpresa": "5511900000001", "telefoneCliente": "5511911110000", "texto": "Oi! Tudo ótimo, como posso ajudar?", "direcao": "SAIDA_APP" }
