@@ -68,6 +68,7 @@ export type StageChangeItem = {
   fromStage: { name: string } | null;
   toStage: { name: string };
   changedBy: { name: string } | null;
+  reason: string | null;
 };
 
 export type WhatsAppNumberItem = {

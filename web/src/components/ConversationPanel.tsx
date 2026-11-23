@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { formatBRL, formatDateTime, formatPhone } from '@/lib/format';
@@ -11,6 +13,14 @@ type Props = {
   onAtualizada: (conversa: ConversationDetail) => void; // avisa a página que algo mudou
 };
 
+/** Quem moveu: uma pessoa, uma regra automática ou a IA */
+function quemMoveu(h: StageChangeItem): string {
+  if (h.byAi) return 'IA';
+  if (h.changedBy) return h.changedBy.name;
+  if (h.reason) return 'Automático';
+  return 'Sistema';
+}
+
 export function ConversationPanel({ conversaId, stages, versao, onFechar, onAtualizada }: Props) {
   const [conversa, setConversa] = useState<ConversationDetail | null>(null);
   const [historico, setHistorico] = useState<StageChangeItem[]>([]);
@@ -19,7 +29,6 @@ export function ConversationPanel({ conversaId, stages, versao, onFechar, onAtua
   const [salvando, setSalvando] = useState(false);
   const fimDasMensagens = useRef<HTMLDivElement>(null);
 
-  // Busca a conversa e o histórico sempre que abrir uma conversa diferente
   // Quando abre OUTRA conversa: limpa a tela
   useEffect(() => {
     setConversa(null);
@@ -212,13 +221,17 @@ export function ConversationPanel({ conversaId, stages, versao, onFechar, onAtua
               <summary className="cursor-pointer text-sm font-semibold text-slate-800">
                 Histórico de estágios ({historico.length})
               </summary>
-              <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-slate-700">
+              <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto text-xs text-slate-700">
                 {historico.map((h) => (
                   <li key={h.id}>
-                    <span className="text-slate-500">{formatDateTime(h.createdAt)}</span> ·{' '}
-                    {h.fromStage ? `${h.fromStage.name} → ` : 'Criada em '}
-                    <strong>{h.toStage.name}</strong> ·{' '}
-                    {h.byAi ? 'automático' : (h.changedBy?.name ?? 'sistema')}
+                    <p>
+                      <span className="text-slate-500">{formatDateTime(h.createdAt)}</span> ·{' '}
+                      {h.fromStage ? `${h.fromStage.name} → ` : 'Criada em '}
+                      <strong>{h.toStage.name}</strong> ·{' '}
+                      <span className={h.changedBy ? '' : 'font-medium text-indigo-700'}>{quemMoveu(h)}</span>
+                    </p>
+                    {/* Motivo: aparece quando foi uma regra (ou, na Fase 2, a IA) */}
+                    {h.reason && <p className="mt-0.5 pl-3 text-slate-500">{h.reason}</p>}
                   </li>
                 ))}
               </ul>
