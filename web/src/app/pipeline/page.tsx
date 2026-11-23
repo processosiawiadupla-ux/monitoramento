@@ -198,7 +198,11 @@ export default function PipelinePage() {
             Números
           </Link>
         )}
-
+    {eu.role === 'ADMIN' && (
+  <Link href="/admin/regras" className="text-sm text-slate-700 underline hover:text-slate-900">
+    Regras
+  </Link>
+)}
           <span className="text-sm text-slate-700">
             {eu.name} · {eu.role}
           </span>

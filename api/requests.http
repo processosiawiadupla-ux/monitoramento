@@ -192,9 +192,12 @@ Content-Type: application/json
 
 {
   "numeroEmpresa": "5511900000001",
-  "telefoneCliente": "5511955554444",
   "nomeContato": "Cliente Teste",
-  "texto": "Oi! Vi o anúncio, quanto custa?"
+  "numeroEmpresa": "5511900000001", 
+  "telefoneCliente": "5511922221111", 
+  "nomeContato": "Cliente Pix", 
+  "texto": "Oi, mandei o pix agora" 
+ 
 }
 
 ### SIMULADOR 2: o MESMO cliente manda outra mensagem

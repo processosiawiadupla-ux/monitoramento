@@ -80,3 +80,16 @@ export type WhatsAppNumberItem = {
   _count: { conversations: number };
 };
 
+export type RuleTrigger = 'FIRST_REPLY' | 'INBOUND_KEYWORD' | 'OUTBOUND_KEYWORD';
+
+export type StageRuleItem = {
+  id: string;
+  name: string;
+  trigger: RuleTrigger;
+  keywords: string[];
+  toStageId: string;
+  position: number;
+  active: boolean;
+  toStage: { id: string; name: string; color: string };
+};
+

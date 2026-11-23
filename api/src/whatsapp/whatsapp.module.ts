@@ -8,3 +8,5 @@ import { SimuladorController } from './simulador.controller';
   exports: [EntradaService], // o adaptador da YCloud vai usar na semana que vem
 })
 export class WhatsappModule {}
+
+

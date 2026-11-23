@@ -1,11 +1,3 @@
-import { WhatsappModule } from './whatsapp/whatsapp.module';
-import { WhatsappNumbersModule } from './whatsapp-numbers/whatsapp-numbers.module';
-import { ConversationsModule } from './conversations/conversations.module';
-import { RealtimeModule } from './realtime/realtime.module';
-import { UsersModule } from './users/users.module';
-import { StagesModule } from './stages/stages.module';
-
-
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -16,6 +8,13 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { AuthGuard } from './auth/auth.guard';
 import { RolesGuard } from './auth/roles.guard';
+import { UsersModule } from './users/users.module';
+import { StagesModule } from './stages/stages.module';
+import { ConversationsModule } from './conversations/conversations.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { WhatsappNumbersModule } from './whatsapp-numbers/whatsapp-numbers.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { StageRulesModule } from './stage-rules/stage-rules.module';
 
 @Module({
   imports: [
@@ -29,14 +28,13 @@ import { RolesGuard } from './auth/roles.guard';
     RealtimeModule,
     WhatsappNumbersModule,
     WhatsappModule,
+    StageRulesModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    // Guards GLOBAIS: valem para TODAS as rotas, nesta ordem.
-    // Uma rota nova já nasce protegida; só fica aberta se tiver @Public().
-    { provide: APP_GUARD, useClass: AuthGuard },  // 1º: está logado?
-    { provide: APP_GUARD, useClass: RolesGuard }, // 2º: tem o papel exigido?
+    { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AppModule {}
